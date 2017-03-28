@@ -1,0 +1,7 @@
+start a new git repo: git init
+create a new file 
+adding this file to stage: git add file 
+commit this file to current git repo: git commit -m "messages"
+check git repo status : git log 
+go back to previous version : git checkout commit_id
+check git repo status : git status

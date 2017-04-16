@@ -29,7 +29,7 @@ double compute_residual(double  *lu, int lN, double invhsq){
     double tmp, gres = 0.0, lres = 0.0;
     for (p = 1; p <= lN; p++){
         for ( q = 1; q <= lN; q++){
-            tmp = ((2.0* lu[convertToOneDimension(p,q)]-lu[convertToOneDimension(p,q-1)]-lu[convertToOneDimension(p,q+1)]- lu[convertToOneDimension(p-1,q)]-lu[convertToOneDimension(p + 1,q)] )*invhsq -1);
+            tmp = ((2.0* lu[convertToOneDimension(p,q)]-lu[convertToOneDimension(p,q-1)]-lu[convertToOneDimension(p,q+1)] )*invhsq -1);
             //tmp = ((2.0*u[p][q] - u[p][q-1] - u[p][q+1]) * invhsq - 1);
             lres += tmp * tmp;
             //cout<< "tmp is " <<tmp <<endl;
@@ -123,6 +123,25 @@ int main(int argc, char** argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     for (iter = 0; iter < max_iters && gres/gres0 > tol; iter++) {
         
+        
+         MPI_Barrier(MPI_COMM_WORLD);
+        /*
+        if (rank == 1){
+        cout << "lu :" <<endl;
+        for (i = 0; i <= lN + 1; i++){
+            for (j = 0; j <= lN + 1; j++){
+                
+                cout << lu[convertToOneDimension(i,j)] << " ";
+            }
+            cout << endl;
+        }
+            
+        }
+              cout << endl;
+         */
+        
+        
+        
         /* Jacobi step for local points */
         for (i = 1; i <= lN; i++){
             for (j = 1; j <= lN; j++){
@@ -132,7 +151,7 @@ int main(int argc, char** argv) {
             }
             
         }
-        
+  
         
         
         
@@ -161,9 +180,17 @@ int main(int argc, char** argv) {
             
             MPI_Send(topSend, lN, MPI_DOUBLE, rank+sqrt(p), 124, MPI_COMM_WORLD);
             MPI_Recv(topRec, lN , MPI_DOUBLE, rank+sqrt(p), 123, MPI_COMM_WORLD, status);
+            /*
+            cout << "toprec is " <<endl;
+            for (i = 1; i <= lN; i++ ){
+                cout << topRec[i - 1] << " ";
+            }
+            cout << " "<< endl;
+             */
             delete [] topSend;
         }
         
+    
         //cout<< "i am rank " <<rank<< " first step finished"<<endl;
         
         //send its lower values to its bottom block and receive from them
@@ -174,10 +201,15 @@ int main(int argc, char** argv) {
                 bottomSend[i - 1] = lunew[convertToOneDimension(1,i)];
             }
             
-            
-            
             MPI_Send(bottomSend, lN, MPI_DOUBLE, rank - sqrt(p), 123, MPI_COMM_WORLD);
             MPI_Recv(bottomRec, lN , MPI_DOUBLE, rank - sqrt(p), 124, MPI_COMM_WORLD, status);
+            /*
+            cout << "bottomrec is " <<endl;
+            for (i = 1; i <= lN; i++ ){
+                cout << bottomRec[i - 1] << " ";
+            }
+            cout << " "<< endl;
+             */
             delete[] bottomSend;
           
         }
@@ -196,6 +228,14 @@ int main(int argc, char** argv) {
             MPI_Send(leftSend, lN, MPI_DOUBLE, rank - 1, 126, MPI_COMM_WORLD);
             MPI_Recv(leftRec, lN , MPI_DOUBLE, rank - 1, 125, MPI_COMM_WORLD, status);
             
+            /*
+            cout << "leftrec is " <<endl;
+            for (i = 1; i <= lN; i++ ){
+                cout << leftRec[i - 1] << " ";
+            }
+            cout << " "<< endl;
+             */
+            
             delete[] leftSend;
         }
         
@@ -213,12 +253,20 @@ int main(int argc, char** argv) {
             MPI_Send(rightSend, lN, MPI_DOUBLE, rank + 1, 125, MPI_COMM_WORLD);
             MPI_Recv(rightRec, lN , MPI_DOUBLE, rank + 1 , 126, MPI_COMM_WORLD, status);
             
+            /*
+            cout << "rightrec is " <<endl;
+            for (i = 1; i <= lN; i++ ){
+                cout << rightRec[i - 1] << " ";
+            }
+            cout << " "<< endl;
+            */
+            
             delete []  rightSend;
         }
         
           //cout<< "i am rank " <<rank<< " third step finished"<<endl;
         
-         MPI_Barrier(MPI_COMM_WORLD);
+        
         
         for (i = 1; i <= lN; i++ ){
             lunew[convertToOneDimension(lN + 1, i)] = topRec[i - 1];
@@ -229,6 +277,27 @@ int main(int argc, char** argv) {
             
         }
         
+        MPI_Barrier(MPI_COMM_WORLD);
+        
+        
+        /*
+        cout << "after modification" <<endl;
+        if (rank == 1){
+            
+            cout << "lunew :" <<endl;
+            for (i = 0; i <= lN+1 ; i++){
+                for (j = 0; j <= lN+1 ; j++){
+                    
+                    cout << lunew[convertToOneDimension(i,j)] << " ";
+                }
+                cout << endl;
+            }
+            
+        }
+        
+         */
+        
+        
         
         delete [] topRec;
         delete[]  bottomRec;
@@ -238,10 +307,11 @@ int main(int argc, char** argv) {
         
       
        
-
+       
         /* copy new_u onto u */
-        for ( i= 1 ; i <= lN; i++){
-            for ( j = 1; j <= lN; j++){
+        
+        for ( i= 0 ; i <= lN+1 ; i++){
+            for ( j = 0; j <= lN+1 ; j++){
                 //cout << "lunew is " << lunew[convertToOneDimension(i,j)]<<endl;
                 lu[convertToOneDimension(i,j)] = lunew[convertToOneDimension(i,j)];
             }

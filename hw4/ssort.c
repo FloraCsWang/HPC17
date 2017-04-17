@@ -23,7 +23,7 @@ static int compare(const void *a, const void *b)
 int main( int argc, char *argv[])
 {
     int rank;
-    int i, N;
+    int i, j, N;
     int *vec;
     int p;
     
@@ -97,7 +97,7 @@ int main( int argc, char *argv[])
     int *sendBuffer = calloc(p * p, sizeof(int) );
     int * recBuffer = calloc(p * p, sizeof(int) );
     for (i = 0; i < p; i++){
-        for (int j = 0; j < p; j++ ){
+        for ( j = 0; j < p; j++ ){
             sendBuffer[i*p+j] = count[j];
         }
     }

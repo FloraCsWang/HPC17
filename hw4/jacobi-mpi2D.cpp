@@ -11,12 +11,12 @@
 //#include "util.h"
 #include <cmath>
 #include <mpi.h>
+#include <assert.h>
 
 
 using namespace std;
 
 int lN;
-
 
 int convertToOneDimension(int x, int y){
     return (lN + 2) * x + y;
@@ -24,8 +24,7 @@ int convertToOneDimension(int x, int y){
 
 /* compuate global residual, assuming ghost values are updated */
 double compute_residual(double  *lu, int lN, double invhsq){
-    int p;
-    int q;
+    int p, q;
     double tmp, gres = 0.0, lres = 0.0;
     for (p = 1; p <= lN; p++){
         for ( q = 1; q <= lN; q++){
@@ -43,37 +42,32 @@ double compute_residual(double  *lu, int lN, double invhsq){
 }
 
 int main(int argc, char** argv) {
-    int rank;
-    int i, N;
-    int p;
-    int max_iters;
-   
+    int rank, i, p, N, max_iters;
     
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
-    MPI_Status* status;
-    
-   
-    
+    MPI_Status* status1;
+    MPI_Status* status2;
+    MPI_Status* status3;
+    MPI_Status* status4;
+    int sqrp = sqrt(p);
+    assert(p == sqrp*sqrp);
     if (rank == 0 ){
         cout << "input number of discretization points N \n";
         cin >> N;
-        MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    }else {
-        MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
     }
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
     
-    lN = N / p;
+    lN = N / sqrp;
     
     if (rank == 0 ){
         cout << "input max iteration\n";
         cin >> max_iters;
-        MPI_Bcast(&max_iters, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    }else {
-        MPI_Bcast(&max_iters, 1, MPI_INT, 0, MPI_COMM_WORLD);
     }
+    MPI_Bcast(&max_iters, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     
@@ -84,9 +78,6 @@ int main(int argc, char** argv) {
         MPI_Abort(MPI_COMM_WORLD, 0);
     }
     
-    
-    
-    
     /* timing
     MPI_Barrier(MPI_COMM_WORLD);
     timestamp_type time1, time2;
@@ -95,6 +86,7 @@ int main(int argc, char** argv) {
     
     double *lu = new double[(lN+2)*(lN+2)]();
     double *lunew = new double[(lN+2)*(lN+2)]();
+    double *lutemp = new double[(lN+2)*(lN+2)]();
    
     
     double h = 1.0 / (lN + 1);
@@ -105,20 +97,13 @@ int main(int argc, char** argv) {
     /* initial residual */
     gres0 = compute_residual(lu, lN, invhsq);
     gres = gres0;
-    //u[0] = u[N+1] = 0.0;
-  
     int j, iter;
-    
     
     /*
     cout<< "i am rank " <<rank<<endl;
     cout<< "gres is " << gres << "gres0 is " << gres0 << "tol is " <<tol<<"max iter is"<< max_iters
     << "ln is "<<lN<<endl;
      */
-    
-    
-     
-    
     
     MPI_Barrier(MPI_COMM_WORLD);
     for (iter = 0; iter < max_iters && gres/gres0 > tol; iter++) {
@@ -153,8 +138,6 @@ int main(int argc, char** argv) {
         }
   
         
-        
-        
         //cout<<" communicate ghost values"<<endl;
         
         double* topRec;
@@ -171,7 +154,7 @@ int main(int argc, char** argv) {
          //MPI_Barrier(MPI_COMM_WORLD);
         //cout <<"send top values to its top block and receive from them"<<endl;
         
-        if (rank < p - sqrt(p)){
+        if (rank < p - sqrp){
             double* topSend;
             topSend = new double[lN]();
             for (i = 1; i <= lN; i++ ){
@@ -179,7 +162,7 @@ int main(int argc, char** argv) {
             }
             
             MPI_Send(topSend, lN, MPI_DOUBLE, rank+sqrt(p), 124, MPI_COMM_WORLD);
-            MPI_Recv(topRec, lN , MPI_DOUBLE, rank+sqrt(p), 123, MPI_COMM_WORLD, status);
+            MPI_Recv(topRec, lN , MPI_DOUBLE, rank+sqrt(p), 123, MPI_COMM_WORLD, status1);
             /*
             cout << "toprec is " <<endl;
             for (i = 1; i <= lN; i++ ){
@@ -194,7 +177,7 @@ int main(int argc, char** argv) {
         //cout<< "i am rank " <<rank<< " first step finished"<<endl;
         
         //send its lower values to its bottom block and receive from them
-        if (rank > sqrt(p) - 1){
+        if (rank > sqrp - 1){
             double* bottomSend;
             bottomSend = new double[lN]();
             for (i = 1; i <= lN; i++ ){
@@ -202,7 +185,7 @@ int main(int argc, char** argv) {
             }
             
             MPI_Send(bottomSend, lN, MPI_DOUBLE, rank - sqrt(p), 123, MPI_COMM_WORLD);
-            MPI_Recv(bottomRec, lN , MPI_DOUBLE, rank - sqrt(p), 124, MPI_COMM_WORLD, status);
+            MPI_Recv(bottomRec, lN , MPI_DOUBLE, rank - sqrt(p), 124, MPI_COMM_WORLD, status2);
             /*
             cout << "bottomrec is " <<endl;
             for (i = 1; i <= lN; i++ ){
@@ -218,7 +201,7 @@ int main(int argc, char** argv) {
         
         
         // send it left values to its left block and receive from them
-        if ((rank % (int)sqrt(p) )!= 0){
+        if ((rank % sqrp )!= 0){
             double* leftSend;
             leftSend = new double[lN]();
             for (i = 1; i <= lN; i++ ){
@@ -226,7 +209,7 @@ int main(int argc, char** argv) {
             }
 
             MPI_Send(leftSend, lN, MPI_DOUBLE, rank - 1, 126, MPI_COMM_WORLD);
-            MPI_Recv(leftRec, lN , MPI_DOUBLE, rank - 1, 125, MPI_COMM_WORLD, status);
+            MPI_Recv(leftRec, lN , MPI_DOUBLE, rank - 1, 125, MPI_COMM_WORLD, status3);
             
             /*
             cout << "leftrec is " <<endl;
@@ -243,7 +226,7 @@ int main(int argc, char** argv) {
        
         
         //send its right values to its right block and receive from them
-        if ((rank + 1 ) % (int)sqrt(p) != 0 ){
+        if ((rank + 1 ) % sqrp != 0 ){
             double* rightSend;
             rightSend = new double[lN]();
             for (i = 1; i <= lN; i++ ){
@@ -251,7 +234,7 @@ int main(int argc, char** argv) {
             }
             
             MPI_Send(rightSend, lN, MPI_DOUBLE, rank + 1, 125, MPI_COMM_WORLD);
-            MPI_Recv(rightRec, lN , MPI_DOUBLE, rank + 1 , 126, MPI_COMM_WORLD, status);
+            MPI_Recv(rightRec, lN , MPI_DOUBLE, rank + 1 , 126, MPI_COMM_WORLD, status4);
             
             /*
             cout << "rightrec is " <<endl;
@@ -297,18 +280,13 @@ int main(int argc, char** argv) {
         
          */
         
-        
-        
         delete [] topRec;
         delete[]  bottomRec;
         delete[]  leftRec;
         delete[] rightRec;
-        
-        
-      
-       
        
         /* copy new_u onto u */
+        /*
         
         for ( i= 0 ; i <= lN+1 ; i++){
             for ( j = 0; j <= lN+1 ; j++){
@@ -316,9 +294,12 @@ int main(int argc, char** argv) {
                 lu[convertToOneDimension(i,j)] = lunew[convertToOneDimension(i,j)];
             }
         }
+         */
         
+        lutemp = lu;
+        lu = lunew;
+        lunew = lutemp;
         //cout<< "I am rank " <<rank <<endl;
-        
         
         if (0 == (iter % 10)) {
             gres = compute_residual(lu, lN, invhsq);
@@ -326,10 +307,9 @@ int main(int argc, char** argv) {
             cout << "Iter : "<<iter<< ", Residual: "<< gres<<endl;
              }
         }
+        cout << "At the end"<<endl;
     }
-    
-    
-   
+    cout<< "hello"<<endl;
     
     /* timing
     get_timestamp(&time2);

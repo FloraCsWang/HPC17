@@ -28,22 +28,20 @@ double compute_residual(double  *lu, int lN, double invhsq){
     double tmp, gres = 0.0, lres = 0.0;
     for (p = 1; p <= lN; p++){
         for ( q = 1; q <= lN; q++){
-            tmp = ((2.0* lu[convertToOneDimension(p,q)]-lu[convertToOneDimension(p,q-1)]-lu[convertToOneDimension(p,q+1)] )*invhsq -1);
-            //tmp = ((2.0*u[p][q] - u[p][q-1] - u[p][q+1]) * invhsq - 1);
+            tmp = ((2.0* lu[convertToOneDimension(p,q)]-
+		    lu[convertToOneDimension(p,q-1)]-
+		    lu[convertToOneDimension(p,q+1)] )*invhsq -1);
             lres += tmp * tmp;
-            //cout<< "tmp is " <<tmp <<endl;
         }
     }
-    
-    ///cout  << "lres is " <<lres<<endl;
- 
+
     MPI_Allreduce(&lres, &gres, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     return sqrt(gres);
 }
 
 int main(int argc, char** argv) {
     int rank, i, p, N, max_iters;
-    
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
@@ -55,19 +53,18 @@ int main(int argc, char** argv) {
         cin >> N;
     }
     MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    
+
     lN = N / sqrp;
-    
+
     if (rank == 0 ){
         cout << "input max iteration\n";
         cin >> max_iters;
     }
     MPI_Bcast(&max_iters, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    
-    
-    if ((N % p != 0) && rank == 0 ) {
+
+    if ((N % sqrp != 0) && rank == 0 ) {
         printf("N: %d, local N: %d\n", N, lN);
-        printf("Exiting. N must be a multiple of p\n");
+        printf("Exiting. N must be a multiple of sqrt(p)\n");
         MPI_Abort(MPI_COMM_WORLD, 0);
     }
     
@@ -81,83 +78,73 @@ int main(int argc, char** argv) {
     double *lunew = new double[(lN+2)*(lN+2)]();
     double *lutemp;
 
-    double h = 1.0 / (lN + 1);
+    double h = 1.0 / (N + 1);
     double hsq = h * h;
     double invhsq = 1./hsq;
     double gres, gres0, tol = 1e-5;
-    
+
     /* initial residual */
     gres0 = compute_residual(lu, lN, invhsq);
     gres = gres0;
     int j, iter;
-    
-    cout<< "i am rank " <<rank<<endl;
-    cout<< "gres is " << gres << "gres0 is " << gres0 << "tol is " <<tol<<"max iter is"<< max_iters
-    << "ln is "<<lN<<endl;
-    
+
+    if (rank == 0) {
+      //cout << "i am rank " << rank << endl;
+      //      cout << "gres is " << gres << "gres0 is " << gres0 <<
+      //	"tol is " << tol << "max iter is" << max_iters
+      //   << "ln is "<< lN << endl;
+    }
     for (iter = 0; iter < max_iters && gres/gres0 > tol; iter++) {
-        
         /*
         if (rank == 1){
         cout << "lu :" <<endl;
         for (i = 0; i <= lN + 1; i++){
             for (j = 0; j <= lN + 1; j++){
-                
                 cout << lu[convertToOneDimension(i,j)] << " ";
-            }
+	       }
             cout << endl;
-        }
-            
+	    }
         }
               cout << endl;
          */
-        
-        
         /* Jacobi step for local points */
         for (i = 1; i <= lN; i++){
             for (j = 1; j <= lN; j++){
-                lunew[convertToOneDimension(i,j)] = 0.25 *(hsq  + lu[convertToOneDimension(i-1,j)] + lu[convertToOneDimension(i,j-1)] + lu[convertToOneDimension(i+1,j)] + lu[convertToOneDimension(i,j+1)] );
-                //unew[i][j] = 0.25 *(hsq * hsq + u[i-1][j] + u[i][j-1] + u[i+1][j] + u[i][j+1] );
-                //std::cout << "unew[ "<< i<< "][" <<j <<"] is " << u[convertToOneDimension(i,j)] <<endl;
+                lunew[convertToOneDimension(i,j)] = 0.25 *
+		  (hsq  + lu[convertToOneDimension(i-1,j)] +
+		   lu[convertToOneDimension(i,j-1)] +
+		   lu[convertToOneDimension(i+1,j)] +
+		   lu[convertToOneDimension(i,j+1)] );
             }
         }
-        
-        cout<<" communicate ghost values"<<endl;
-        
-        double* topRec;
-        double* bottomRec;
-        //double* leftRec;
-        //double* rightRec;
-        
-        topRec = new double[lN]();
-        bottomRec = new double[lN]();
-        //leftRec = new double[lN]();
-        //rightRec = new double[lN]();
-        
-        cout <<"send top values to its top block and receive from them"<<endl;
-        
+	if (rank == 0)
+	  cout << " communicate ghost values" << endl;
+
+        double *topRec = new double[lN]();
+        double *bottomRec = new double[lN]();
+        double *leftRec = new double[lN]();
+        double *rightRec = new double[lN]();
+
+    	if (rank == 0)
+	  cout << "send top values to its top block and receive from them" << endl;
+
         if (rank < p - sqrp){
-            double* topSend;
-            topSend = new double[lN]();
+            double *topSend = new double[lN]();
             for (i = 1; i <= lN; i++ ){
                 topSend[i - 1] = lunew[convertToOneDimension(lN, i)];
             }
-            
-            MPI_Send(topSend, lN, MPI_DOUBLE, rank+sqrp, 124, MPI_COMM_WORLD);
-            MPI_Recv(topRec, lN , MPI_DOUBLE, rank+sqrp, 123, MPI_COMM_WORLD, status1);
-            /*
-            cout << "toprec is " <<endl;
-            for (i = 1; i <= lN; i++ ){
-                cout << topRec[i - 1] << " ";
-            }
-            cout << " "<< endl;
-             */
+	    MPI_Send(topSend, lN, MPI_DOUBLE, rank+sqrp, 124, MPI_COMM_WORLD);
+	    if (rank == 0)
+	      cout << "Done 1" << endl;
+	    MPI_Recv(topRec, lN , MPI_DOUBLE, rank+sqrp, 123, MPI_COMM_WORLD, status1);
+
+
             delete [] topSend;
         }
-        
-    
-        cout<< "i am rank " <<rank<< " first step finished"<<endl;
-        
+
+	if (rank == 0)
+	  cout << "i am rank " << rank << " first step finished"<<endl;
+
         //send its lower values to its bottom block and receive from them
         if (rank > sqrp - 1){
             double* bottomSend;
@@ -165,24 +152,20 @@ int main(int argc, char** argv) {
             for (i = 1; i <= lN; i++ ){
                 bottomSend[i - 1] = lunew[convertToOneDimension(1,i)];
             }
-            
-            MPI_Send(bottomSend, lN, MPI_DOUBLE, rank - sqrp, 123, MPI_COMM_WORLD);
+	    if (rank == 2)
+	      cout << "other side of communication" << endl;
             MPI_Recv(bottomRec, lN , MPI_DOUBLE, rank - sqrp, 124, MPI_COMM_WORLD, status2);
-            /*
-            cout << "bottomrec is " <<endl;
-            for (i = 1; i <= lN; i++ ){
-                cout << bottomRec[i - 1] << " ";
-            }
-            cout << " "<< endl;
-             */
+	    if (rank == 2)
+	      cout << "Done 2" << endl;
+	    MPI_Send(bottomSend, lN, MPI_DOUBLE, rank - sqrp, 123, MPI_COMM_WORLD);
+
+
             delete[] bottomSend;
         }
-        
-         cout<< "i am rank " <<rank<< " second step finished"<<endl;
-        
-        
+	if (rank == 0)
+	  cout<< "i am rank " <<rank<< " second step finished"<<endl;
+
         // send it left values to its left block and receive from them
-        /*
         if ((rank % sqrp )!= 0){
             double* leftSend;
             leftSend = new double[lN]();
@@ -192,98 +175,52 @@ int main(int argc, char** argv) {
 
             MPI_Send(leftSend, lN, MPI_DOUBLE, rank - 1, 126, MPI_COMM_WORLD);
             MPI_Recv(leftRec, lN , MPI_DOUBLE, rank - 1, 125, MPI_COMM_WORLD, status3);
-            
-         
+
             cout << "leftrec is " <<endl;
             for (i = 1; i <= lN; i++ ){
                 cout << leftRec[i - 1] << " ";
             }
             cout << " "<< endl;
-         
-            
             delete[] leftSend;
         }
-        
-         cout<< "i am rank " <<rank<< " third step finished"<<endl;
-         */
-       
-        
+
+	if (rank == 0)
+	  cout<< "i am rank " <<rank<< " third step finished"<<endl;
+
         //send its right values to its right block and receive from them
-        /*
         if ((rank + 1 ) % sqrp != 0 ){
             double* rightSend;
             rightSend = new double[lN]();
             for (i = 1; i <= lN; i++ ){
                 rightSend[i - 1] = lunew[convertToOneDimension(i, lN)];
             }
-            
             MPI_Send(rightSend, lN, MPI_DOUBLE, rank + 1, 125, MPI_COMM_WORLD);
             MPI_Recv(rightRec, lN , MPI_DOUBLE, rank + 1 , 126, MPI_COMM_WORLD, status4);
-            
-         
             cout << "rightrec is " <<endl;
             for (i = 1; i <= lN; i++ ){
                 cout << rightRec[i - 1] << " ";
             }
             cout << " "<< endl;
-         
-            
             delete []  rightSend;
         }
-        
+
           cout<< "i am rank " <<rank<< " third step finished"<<endl;
-        */
-        
-        
+
         for (i = 1; i <= lN; i++ ){
             lunew[convertToOneDimension(lN + 1, i)] = topRec[i - 1];
             lunew[convertToOneDimension(0,i)] = bottomRec[i - 1];
-            //lunew[convertToOneDimension(i,0)] = leftRec[i - 1];
-            //lunew[convertToOneDimension(i,lN + 1)] = rightRec[i - 1];
+            lunew[convertToOneDimension(i,0)] = leftRec[i - 1];
+            lunew[convertToOneDimension(i,lN + 1)] = rightRec[i - 1];
+        }
 
-            
-        }
-        
-        MPI_Barrier(MPI_COMM_WORLD);
-        
-        
-        /*
-        cout << "after modification" <<endl;
-        if (rank == 1){
-            
-            cout << "lunew :" <<endl;
-            for (i = 0; i <= lN+1 ; i++){
-                for (j = 0; j <= lN+1 ; j++){
-                    
-                    cout << lunew[convertToOneDimension(i,j)] << " ";
-                }
-                cout << endl;
-            }
-            
-        }
-        
-         */
-        
         delete [] topRec;
         delete[]  bottomRec;
-        //delete[]  leftRec;
-        //delete[] rightRec;
-       
-        /* copy new_u onto u */
-        /*
-        
-        for ( i= 0 ; i <= lN+1 ; i++){
-            for ( j = 0; j <= lN+1 ; j++){
-                //cout << "lunew is " << lunew[convertToOneDimension(i,j)]<<endl;
-                lu[convertToOneDimension(i,j)] = lunew[convertToOneDimension(i,j)];
-            }
-        }
-         */
-        
+        delete[]  leftRec;
+        delete[] rightRec;
+
         lutemp = lu;
         lu = lunew;
         lunew = lutemp;
-        //cout<< "I am rank " <<rank <<endl;
         
         if (0 == (iter % 10)) {
             gres = compute_residual(lu, lN, invhsq);
@@ -291,9 +228,10 @@ int main(int argc, char** argv) {
             cout << "Iter : "<<iter<< ", Residual: "<< gres<<endl;
              }
         }
-        cout << "At the end"<<endl;
+        //cout << "At the end"<<endl;
     }
-    cout<< "hello"<<endl;
+    if (rank == 0)
+      cout<< "Done. Cleaning up."<<endl;
     
     /* timing
     get_timestamp(&time2);
@@ -303,8 +241,4 @@ int main(int argc, char** argv) {
     delete []lu;
     delete []lunew;
     MPI_Finalize();
-    return 0;
-    
-    
-    
 }

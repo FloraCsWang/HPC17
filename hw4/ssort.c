@@ -5,6 +5,7 @@
 #include <mpi.h>
 #include <stdlib.h>
 #include <time.h>
+#include "util.h"
 
 
 static int compare(const void *a, const void *b)
@@ -44,6 +45,12 @@ int main( int argc, char *argv[])
         vec[i] = rand();
     }
     //printf("rank: %d, first entry: %d\n", rank, vec[0]);
+    
+    // timing
+    MPI_Barrier(MPI_COMM_WORLD);
+    timestamp_type time1, time2;
+    get_timestamp(&time1);
+    
     
     // sort locally
     qsort(vec, N, sizeof(int), compare);
@@ -140,6 +147,12 @@ int main( int argc, char *argv[])
         
         fclose(fd);
     }
+    
+    // timing
+    get_timestamp(&time2);
+    double elapsed = timestamp_diff_in_seconds(time1,time2);
+    if (rank == 0)
+    printf("Time elapsed is %f seconds.\n", elapsed);
 
     
     free(vec);

@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include  <stdlib.h>
-//#include "util.h"
+#include "util.h"
 #include <math.h>
 #include <mpi.h>
 #include <assert.h>
@@ -58,11 +58,11 @@ int main(int argc, char * argv[]) {
         MPI_Abort(MPI_COMM_WORLD, 0);
     }
     
-    /* timing
+    //timing
     MPI_Barrier(MPI_COMM_WORLD);
     timestamp_type time1, time2;
     get_timestamp(&time1);
-     */
+    
  
     
     double *lu = (double *) calloc(sizeof(double), (lN+2)*(lN+2));
@@ -178,11 +178,12 @@ int main(int argc, char * argv[]) {
        
     }
    
-    /* timing
+    // timing
     get_timestamp(&time2);
     double elapsed = timestamp_diff_in_seconds(time1,time2);
+    if (0 == rank)
     printf("Time elapsed is %f seconds.\n", elapsed);
-    */
+    
     free(topSend);
     free(bottomSend);
     free(leftSend);

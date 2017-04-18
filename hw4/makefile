@@ -1,4 +1,4 @@
-linker: mpi_solved1.c  mpi_solved2.c mpi_solved3.c mpi_solved4.c mpi_solved6.c mpi_solved7.c jacobi-mpi2D.cpp ssort.c
+linker: mpi_solved1.c  mpi_solved2.c mpi_solved3.c mpi_solved4.c mpi_solved6.c mpi_solved7.c jacobi-mpi2D.c ssort.c jacobi-mpi2D-nonblocking.c
 	mpicc  mpi_solved1.c -o mpi_solved1
 	mpicc  mpi_solved2.c -o mpi_solved2
 	mpicc  mpi_solved3.c -o mpi_solved3
@@ -7,6 +7,7 @@ linker: mpi_solved1.c  mpi_solved2.c mpi_solved3.c mpi_solved4.c mpi_solved6.c m
 	mpicc  mpi_solved7.c -o mpi_solved7
 	mpicc  ssort.c  -o ssort
 	mpicc jacobi-mpi2D.c -o jacobi-mpi2D -lm
+	mpicc jacobi-mpi2D-nonblocking.c -o jacobi-mpi2D-nonblocking -lm
 
 
 clean:

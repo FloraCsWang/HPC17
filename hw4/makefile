@@ -6,7 +6,7 @@ linker: mpi_solved1.c  mpi_solved2.c mpi_solved3.c mpi_solved4.c mpi_solved6.c m
 	mpicc  mpi_solved6.c -o mpi_solved6
 	mpicc  mpi_solved7.c -o mpi_solved7
 	mpicc  ssort.c  -o ssort
-	mpic++ jacobi-mpi2D.cpp -o jacobi-mpi2D
+	mpicc jacobi-mpi2D.c -o jacobi-mpi2D -lm
 
 
 clean:

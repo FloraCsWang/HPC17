@@ -44,13 +44,11 @@ int main( int argc, char *argv[])
     for (i = 0; i < N; ++i) {
         vec[i] = rand();
     }
-    //printf("rank: %d, first entry: %d\n", rank, vec[0]);
     
     // timing
     MPI_Barrier(MPI_COMM_WORLD);
     timestamp_type time1, time2;
     get_timestamp(&time1);
-    
     
     // sort locally
     qsort(vec, N, sizeof(int), compare);
@@ -64,15 +62,11 @@ int main( int argc, char *argv[])
         randomEntries[i] = vec[index];
     }
     
-  
-    
     // every processor communicates the selected entries to the root processor; use for instance an MPI_Gather
     int root = 0;
     int *rbuf;
     rbuf = calloc(p * s, sizeof(int) );
     MPI_Gather( randomEntries, s, MPI_INT, rbuf, s, MPI_INT, root, MPI_COMM_WORLD);
-    
-    
     
     // root processor does a sort, determinates splitters that split the data into P buckets of approximately the same size root process broadcasts splitters
     int* splitters = calloc(p - 1, sizeof(int) );
@@ -84,10 +78,7 @@ int main( int argc, char *argv[])
         }
     }
     
-    
     MPI_Bcast(splitters, p - 1, MPI_INT, root, MPI_COMM_WORLD);
-    
-   
     
     // every processor uses the obtained splitters to decidewhich integers need to be sent to which other processor (local bins)
     
@@ -100,48 +91,38 @@ int main( int argc, char *argv[])
         }
         count[r] = count[r] + 1;
         buckets[i] = r;
-        //MPI_Send(vec+i, 1, MPI_INT , r, 0 , MPI_COMM_WORLD);
     }
     
     //send and receive:
-    
-    int *sendBuffer = calloc(p * p, sizeof(int) );
-    int * recBuffer = calloc(p * p, sizeof(int) );
-    for (i = 0; i < p; i++){
-        for ( j = 0; j < p; j++ ){
-            sendBuffer[i*p+j] = count[j];
-        }
-    }
-    MPI_Alltoall(sendBuffer, p, MPI_INT, recBuffer, p, MPI_INT, MPI_COMM_WORLD  );
-    
-    
-    
-
+    int* recBuffer = calloc(p*p , sizeof(int));
+   
+    MPI_Allgather(count, p, MPI_INT, recBuffer, p, MPI_INT, MPI_COMM_WORLD);
     
     int totalNum = 0;
+    int selfNum = 0; //mark how many stay in the self bucket
     for (i = 0; i < p; i++){
+        if (i == rank)
+            selfNum = recBuffer[i*p + rank];
         totalNum +=  recBuffer[i*p + rank];
     }
+    
     int * resVector = calloc(totalNum, sizeof(int));
     
-    
     for ( i= 0; i < N; i++){
-        printf ("I am rank %d\n", rank);
-        
+        if (buckets[i]!= rank)
         MPI_Send(vec+i, 1, MPI_INT , buckets[i], 0 , MPI_COMM_WORLD);
-        printf("there, rank: %d, i: %d\n", rank, i);
     }
     
-    printf("finished send, i am rank %d\n",rank);
-    
-    for (i = 0; i < totalNum; i++ ){
+    for (i = 0; i < totalNum - selfNum; i++ ){
          MPI_Recv(resVector+i, 1, MPI_INT , MPI_ANY_SOURCE, 0 , MPI_COMM_WORLD, &status);
     }
     
-    printf("finished receive\n");
-
-     
-     
+    //update res vector
+     for (j = 0; j < N; j++ ){
+         if (buckets[j] == rank){
+             resVector[i++] = vec[j];
+         }
+     }
     
     //do a local sort
     qsort(resVector, totalNum, sizeof(int), compare);
@@ -171,12 +152,10 @@ int main( int argc, char *argv[])
     double elapsed = timestamp_diff_in_seconds(time1,time2);
     if (rank == 0)
     printf("Time elapsed is %f seconds.\n", elapsed);
-
     
     free(vec);
     free(randomEntries);
     free(resVector);
-    free(sendBuffer);
     free(recBuffer);
     free(count);
     free(buckets);

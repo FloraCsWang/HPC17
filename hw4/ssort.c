@@ -34,7 +34,7 @@ int main( int argc, char *argv[])
     MPI_Status status;
     
     // Number of random numbers per processor (this should be increased for actual tests or could be passed in through the command line
-    N = 100;
+    N = 10;
     
     vec = calloc(N, sizeof(int));
     //seed random number generator differently on every core
@@ -64,11 +64,14 @@ int main( int argc, char *argv[])
         randomEntries[i] = vec[index];
     }
     
+  
+    
     // every processor communicates the selected entries to the root processor; use for instance an MPI_Gather
     int root = 0;
     int *rbuf;
     rbuf = calloc(p * s, sizeof(int) );
     MPI_Gather( randomEntries, s, MPI_INT, rbuf, s, MPI_INT, root, MPI_COMM_WORLD);
+    
     
     
     // root processor does a sort, determinates splitters that split the data into P buckets of approximately the same size root process broadcasts splitters
@@ -84,6 +87,7 @@ int main( int argc, char *argv[])
     
     MPI_Bcast(splitters, p - 1, MPI_INT, root, MPI_COMM_WORLD);
     
+   
     
     // every processor uses the obtained splitters to decidewhich integers need to be sent to which other processor (local bins)
     
@@ -109,19 +113,33 @@ int main( int argc, char *argv[])
         }
     }
     MPI_Alltoall(sendBuffer, p, MPI_INT, recBuffer, p, MPI_INT, MPI_COMM_WORLD  );
+    
+    
+    
+
+    
     int totalNum = 0;
     for (i = 0; i < p; i++){
         totalNum +=  recBuffer[i*p + rank];
     }
     int * resVector = calloc(totalNum, sizeof(int));
     
+    
     for ( i= 0; i < N; i++){
+        printf ("I am rank %d\n", rank);
+        
         MPI_Send(vec+i, 1, MPI_INT , buckets[i], 0 , MPI_COMM_WORLD);
+        printf("there, rank: %d, i: %d\n", rank, i);
     }
+    
+    printf("finished send, i am rank %d\n",rank);
     
     for (i = 0; i < totalNum; i++ ){
          MPI_Recv(resVector+i, 1, MPI_INT , MPI_ANY_SOURCE, 0 , MPI_COMM_WORLD, &status);
     }
+    
+    printf("finished receive\n");
+
      
      
     

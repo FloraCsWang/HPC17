@@ -30,7 +30,7 @@ int main( int argc, char *argv[])
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
-    MPI_Status* status;
+    MPI_Status status;
     
     // Number of random numbers per processor (this should be increased for actual tests or could be passed in through the command line
     N = 100;
@@ -113,7 +113,7 @@ int main( int argc, char *argv[])
     }
     
     for (i = 0; i < totalNum; i++ ){
-         MPI_Recv(resVector+i, 1, MPI_INT , MPI_ANY_SOURCE, 0 , MPI_COMM_WORLD, status);
+         MPI_Recv(resVector+i, 1, MPI_INT , MPI_ANY_SOURCE, 0 , MPI_COMM_WORLD, &status);
     }
      
      

@@ -179,6 +179,7 @@ int main(int argc, char * argv[]) {
     }
    
     // timing
+    MPI_Barrier(MPI_COMM_WORLD);
     get_timestamp(&time2);
     double elapsed = timestamp_diff_in_seconds(time1,time2);
     if (0 == rank)

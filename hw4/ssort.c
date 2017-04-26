@@ -34,7 +34,7 @@ int main( int argc, char *argv[])
     MPI_Status status;
     
     // Number of random numbers per processor (this should be increased for actual tests or could be passed in through the command line
-    N = 100;
+   sscanf(argv[1], "%d", &N);
     
     vec = calloc(N, sizeof(int));
     //seed random number generator differently on every core
